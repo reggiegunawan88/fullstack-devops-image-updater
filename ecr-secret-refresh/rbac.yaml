@@ -1,0 +1,33 @@
+# ServiceAccount and RBAC for ECR Secret Refresh CronJob
+# CronJob runs in argocd-image-updater-system (where AWS creds exist)
+# and creates the ECR secret in fullstack-devops-k0s namespace
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ecr-secret-refresh
+  namespace: argocd-image-updater-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ecr-secret-refresh
+  namespace: fullstack-devops-k0s
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ecr-secret-refresh
+  namespace: fullstack-devops-k0s
+subjects:
+  - kind: ServiceAccount
+    name: ecr-secret-refresh
+    namespace: argocd-image-updater-system
+roleRef:
+  kind: Role
+  name: ecr-secret-refresh
+  apiGroup: rbac.authorization.k8s.io

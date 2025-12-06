@@ -1,0 +1,71 @@
+# CronJob to refresh ECR docker-registry secret every 6 hours
+# ECR tokens expire after 12 hours, so refreshing every 6 hours provides a safety margin
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ecr-secret-refresh
+  namespace: argocd-image-updater-system
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: ecr-secret-refresh
+          restartPolicy: OnFailure
+          containers:
+            - name: ecr-secret-refresh
+              image: amazon/aws-cli:latest
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-ecr-credentials
+                      key: aws_access_key_id
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-ecr-credentials
+                      key: aws_secret_access_key
+                - name: AWS_REGION
+                  value: us-east-1
+                - name: AWS_ACCOUNT_ID
+                  value: "355446107250"
+                - name: SECRET_NAME
+                  value: ecr-secret
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -e
+
+                  # Detect architecture and install kubectl
+                  ARCH=$(uname -m)
+                  case $ARCH in
+                    x86_64) KUBECTL_ARCH="amd64" ;;
+                    aarch64|arm64) KUBECTL_ARCH="arm64" ;;
+                    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+                  esac
+
+                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${KUBECTL_ARCH}/kubectl"
+                  chmod +x kubectl
+                  mv kubectl /usr/local/bin/
+
+                  # Get ECR login token
+                  ECR_TOKEN=$(aws ecr get-login-password --region ${AWS_REGION})
+                  ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+                  # Delete existing secret if it exists (ignore errors)
+                  kubectl delete secret ${SECRET_NAME} -n fullstack-devops-k0s --ignore-not-found
+
+                  # Create new docker-registry secret in target namespace
+                  kubectl create secret docker-registry ${SECRET_NAME} \
+                    -n fullstack-devops-k0s \
+                    --docker-server=${ECR_REGISTRY} \
+                    --docker-username=AWS \
+                    --docker-password=${ECR_TOKEN}
+
+                  echo "ECR secret refreshed successfully at $(date)"
