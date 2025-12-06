@@ -1,0 +1,39 @@
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: fullstack-devops-image-updater
+  namespace: argocd-image-updater-system
+spec:
+  # Target namespace where ArgoCD applications live
+  namespace: argocd
+
+  # Global settings
+  commonUpdateSettings:
+    updateStrategy: newest-build
+    allowTags: regexp:^master-[0-9]+$
+
+  # Write-back method
+  writeBackConfig:
+    method: argocd
+
+  # Applications to watch
+  applicationRefs:
+    - namePattern: "fullstack-devops"
+      images:
+        - alias: backend
+          imageName: 355446107250.dkr.ecr.us-east-1.amazonaws.com/fullstack-devops/backend
+          manifestTargets:
+            kustomize:
+              name: 355446107250.dkr.ecr.us-east-1.amazonaws.com/fullstack-devops/backend
+
+        - alias: frontend-v1
+          imageName: 355446107250.dkr.ecr.us-east-1.amazonaws.com/fullstack-devops/frontend-v1
+          manifestTargets:
+            kustomize:
+              name: 355446107250.dkr.ecr.us-east-1.amazonaws.com/fullstack-devops/frontend-v1
+
+        - alias: frontend-v2
+          imageName: 355446107250.dkr.ecr.us-east-1.amazonaws.com/fullstack-devops/frontend-v2
+          manifestTargets:
+            kustomize:
+              name: 355446107250.dkr.ecr.us-east-1.amazonaws.com/fullstack-devops/frontend-v2

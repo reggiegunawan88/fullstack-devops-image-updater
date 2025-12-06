@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-config
+  namespace: argocd-image-updater-system
+data:
+  registries.conf: |
+    registries:
+     - name: ECR
+       api_url: https://355446107250.dkr.ecr.us-east-1.amazonaws.com
+       prefix: 355446107250.dkr.ecr.us-east-1.amazonaws.com
+       ping: yes
+       insecure: no
+       credentials: ext:/scripts/ecr-login.sh
